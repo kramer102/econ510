@@ -1,0 +1,125 @@
+---
+title: "HW 3 Kaggle Walmart Data exploration and setup"
+author: "Robert Kramer"
+date: "November 19, 2015"
+output: html_document
+---
+
+
+### Getting the data and putting it together
+I put the data together unziped it and put it ./data
+
+```{r,echo=FALSE, message=FALSE}
+##setup
+#setwd('./all_Robert_asus/prog_asus/R/HW/HW3')
+library(readr)
+library(ggplot2)
+library(reshape)
+library(stargazer)
+library(Quandl)
+library(ggthemes)
+
+```
+```{r,message=FALSE}
+store <- read_csv("./data/stores.csv")
+train <- read_csv("./data/train.csv")
+test <- read_csv("./data/test.csv")
+train <- read_csv("./data/train.csv")
+features <- read_csv("./data/features.csv")
+sampleSubmission <- read_csv("./data/sampleSubmission.csv")
+```
+Merged the data
+
+```{r,message=FALSE}
+## merge the store info 
+train <- merge(train,store, all.x = T)
+test <- merge(test,store, all.x = T)
+
+## merge the features
+train <- merge(train,features, all.x = T)
+test <- merge(test,features, all.x = T)
+```
+I plotted the data to get a quick feel
+```{r,message=FALSE}
+qplot(x = Date,y = Weekly_Sales, data = train)
+qplot(x = Type,y = Weekly_Sales, data = train)
+```
+Sorted it
+```{r,message=FALSE}
+## sort it by Date then Store then Dept
+vars <- c('Store','Dept','Date')
+train1 <- sort_df(train, vars)
+```
+In order to get a better understanding I first looked at 1 store.  Then 1 store 1 day. I looked at store 1 with all departments summed together.  I compared store 1 to total sales.  From this I assumed the stores where qualitatively the same. But...
+```{r,message=FALSE}
+store1 <- train1[train1$Store == 1,]
+qplot(x = Date, y = Weekly_Sales, data = store1, colour=Dept)
+summary(store1)
+
+store1day1 <- store1[store1$Date==store1[[1,2]], ]
+store1day1 <- sort_df(store1day1, 'Weekly_Sales')
+summary(store1day1)
+
+#trying to get aggregate of all dept by store and date
+##all stores
+test1 <- aggregate(store1$Weekly_Sales,list(store1$Date),sum)
+test2 <- aggregate(train$Weekly_Sales,list(train$Date),sum)
+
+Store1toAll <- cbind(test1,test2[2])
+colVars <- c('date','store1_sales','total_sales')
+
+names(Store1toAll) <- colVars
+Store1toAll$date <- as.Date(Store1toAll$date)
+Store1toAll <- data.frame(Store1toAll)
+
+Store1toAll_plot <- ggplot(Store1toAll, aes(date,Store1toAll$store1_sales)) + geom_line(aes(color = "Store 1"))+
+  geom_line(data = Store1toAll, aes(x= date,y=Store1toAll$total_sales/45, color = 'Mean of Total Sales'))+
+    theme_economist() + scale_color_economist() +
+    theme(legend.title = element_blank()) +
+    labs(y= "Weekly Sales",title = ("Weekly sales total vs store 1"))
+Store1toAll_plot
+```
+Then I took a look at the stores by Type and Type C is qualitatively different
+```{r,message=FALSE}
+A_stores <- subset(train1, train1$Type == 'A')
+A_store_numbers <- levels(factor(A_stores$Store))
+B_stores <- subset(train1, train1$Type == 'B')
+B_store_numbers <- levels(factor(B_stores$Store))
+C_stores <- subset(train1, train1$Type == 'C')  
+C_store_numbers <- levels(factor(C_stores$Store))
+
+## get a sense of the different types by weekly sales 
+## aggregate then divide by the number of stores for average
+A_stores_agg <- data.frame(aggregate(A_stores$Weekly_Sales,list(A_stores$Date),sum))
+B_stores_agg <- data.frame(aggregate(B_stores$Weekly_Sales,list(B_stores$Date),sum))
+C_stores_agg <- data.frame(aggregate(C_stores$Weekly_Sales,list(C_stores$Date),sum))
+
+storeType_agg <- cbind(A_stores_agg,B_stores_agg[,2],C_stores_agg[,2])
+names(storeType_agg) <- c('date','typeA','typeB','typeC')
+
+plot <- ggplot(storeType_agg, aes(date,storeType_agg$typeA/length(A_store_numbers))) + geom_line(aes(color = "Type A"))+
+  geom_line(data = storeType_agg, aes(x= date,y=storeType_agg$typeB/length(B_store_numbers), color = 'Type B'))+
+  geom_line(data = storeType_agg, aes(x= date,y=storeType_agg$typeC/length(C_store_numbers), color = 'Type C'))+
+  theme_economist() + scale_color_economist() +
+  theme(legend.title = element_blank()) +
+  labs(y= "Weekly Sales",title = ("Weekly sales mean by type"))
+plot
+```
+I looked a little closer to make sure.
+```{r,message=FALSE}
+qplot(x = storeType_agg$date,y=storeType_agg$typeC,geom='line')
+
+## type Cs look really wierd
+store42 <- subset(train1,train1$Store == 42)
+store42_agg <- aggregate(store42$Weekly_Sales,list(store42$Date),sum)
+plot(store42_agg)
+```
+From this initial analysis I decided to pick a couple stores, one of type A and one of type B to begin an analysis without using the entire dataset.  I don't yet understand the type C's.
+```{r,message=FALSE}
+smallSet <- subset(train1, train1$Store == '1' | train1$Store == '3')
+smallSet1 <- lm(Weekly_Sales ~. ,data=smallSet)
+summary(smallSet1)
+plot(smallSet1)
+
+
+```
