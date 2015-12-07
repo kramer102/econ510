@@ -23,6 +23,8 @@ tables <- tables %>%
   rowwise() %>%
   mutate(RowCount=dbGetQuery(db, paste0("SELECT COUNT(Id) RowCount FROM ", Name))$RowCount[1])
 
+## going to try to get the var names by changing this
+
 print.table(tables)
 
 dbGetQuery(db, "SELECT Year, COUNT(Id) NumSchools FROM Scorecard GROUP BY Year") %>%
@@ -60,4 +62,8 @@ earnings$College <- paste(earnings$Rank, earnings$College, sep=". ")
 earnings$College <- factor(earnings$College, levels=rev(earnings$College))
 
 ### End Example
+
+### basic sqlite from r-bloggers example
+alltables <- dbListTables(db) # one table named scorecard
+cName <- dbGetQuery(db, PRAGMA table_info("/home/robert/all_Robert_asus/prog_asus/R/Project/Data/output/database.sqlite"))
   
